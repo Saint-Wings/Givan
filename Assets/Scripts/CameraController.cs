@@ -8,10 +8,10 @@ public class CameraController : MonoBehaviour
     [SerializeField] private bool autoDetectBoundaries = true;
 
     [Header("Camera Settings")]
-    [SerializeField] private float panSpeed = 20f;
-    [SerializeField] private float zoomSpeed = 5f;
+    [SerializeField] private float panSpeed = 5f;
+    [SerializeField] private float zoomSpeed = 3f;
     [SerializeField] private float minZoom = 2f;
-    [SerializeField] private float maxZoom = 10f;
+    [SerializeField] private float maxZoom = 8f;
     [SerializeField] private float edgePadding = 0.5f;
 
     private Camera cam;

@@ -1,24 +1,30 @@
 ﻿using UnityEngine;
-using UnityEngine.UI; // Для работы с UI
+using System.Collections.Generic;
 
 public class GrassPlacer : MonoBehaviour
 {
     [Header("Настройки травы")]
-    public GameObject grassPrefab;       // Префаб травы
-    public KeyCode placeKey = KeyCode.G; // Клавиша для размещения
-    public LayerMask groundLayer;        // Слой, на котором можно размещать траву
-    public bool canPlaceGrass = false;   // Флаг, разрешающий размещение
+    public GameObject grassPrefab;
+    public KeyCode placeKey = KeyCode.G;
+    public bool canPlaceGrass = false;
 
-    [Header("Лимит травы")]
-    public int maxGrass = 10;            // Максимальное количество травы
-    private int currentGrass = 0;        // Текущее количество травы
+    [Header("Лимиты")]
+    [SerializeField] private int maxGrass = 10;
+    private int currentGrass = 0;
+    private List<GameObject> activeGrass = new List<GameObject>();
 
-    [Header("UI Элементы")]
-    public Text grassCounterText;        // Текст для отображения счетчика
+    [Header("Ссылки")]
+    public Well well;
+
+    [Header("Звуки")]
+    [SerializeField] private AudioClip placeSound;
+    [SerializeField] private AudioClip limitSound;
+    private AudioSource audioSource;
 
     void Start()
     {
-        UpdateGrassCounterUI(); // Обновляем UI при старте
+        audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
     }
 
     void Update()
@@ -29,51 +35,76 @@ public class GrassPlacer : MonoBehaviour
         }
     }
 
-    void TryPlaceGrass()
+    public void TryPlaceGrass()
     {
-        // Если достигнут лимит - выходим
-        if (currentGrass >= maxGrass)
+        if (well == null || !well.playerDrewWater)
         {
-            Debug.Log("Достигнут лимит травы!");
+            Debug.Log("Сначала наберите воду из колодца!");
             return;
         }
 
-        // Получаем все объекты с тегом "Ground_0"
+        if (currentGrass >= maxGrass)
+        {
+            Debug.Log("Достигнут лимит травы!");
+            PlaySound(limitSound);
+            return;
+        }
+
         GameObject[] groundTiles = GameObject.FindGameObjectsWithTag("Ground_0");
+        bool placed = false;
 
         foreach (GameObject groundTile in groundTiles)
         {
-            // Проверяем расстояние до игрока (чтобы не ставить траву слишком далеко)
             if (Vector2.Distance(transform.position, groundTile.transform.position) < 5f)
             {
-                // Размещаем траву как дочерний объект
-                Instantiate(grassPrefab, groundTile.transform.position, Quaternion.identity, groundTile.transform);
-                currentGrass++; // Увеличиваем счетчик
-                UpdateGrassCounterUI(); // Обновляем UI
-                break; // Размещаем только одну траву за нажатие
+                GameObject newGrass = Instantiate(
+                    grassPrefab,
+                    groundTile.transform.position,
+                    Quaternion.identity,
+                    groundTile.transform
+                );
+
+                // Добавляем компонент для отслеживания травы
+                Grass grassComponent = newGrass.AddComponent<Grass>();
+                grassComponent.Initialize(this);
+
+                activeGrass.Add(newGrass);
+                currentGrass++;
+                well.playerDrewWater = false;
+                placed = true;
+                PlaySound(placeSound);
+                break;
             }
         }
+
+        if (!placed) Debug.Log("Рядом нет подходящего места для травы!");
     }
 
-    // Обновляет UI счетчика травы
-    void UpdateGrassCounterUI()
+    // Вызывается при уничтожении травы
+    public void GrassEaten(GameObject grass)
     {
-        if (grassCounterText != null)
+        if (activeGrass.Contains(grass))
         {
-            grassCounterText.text = $"Трава: {currentGrass}/{maxGrass}";
+            activeGrass.Remove(grass);
+            currentGrass--;
         }
     }
 
-    // Метод для изменения флага (можно вызывать из других скриптов)
-    public void SetCanPlaceGrass(bool value)
+    private void PlaySound(AudioClip clip)
     {
-        canPlaceGrass = value;
+        if (clip != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(clip);
+        }
     }
 
-    // Метод для сброса счетчика (если нужно)
     public void ResetGrassCounter()
     {
         currentGrass = 0;
-        UpdateGrassCounterUI();
+        foreach (var grass in activeGrass)
+        {
+            if (grass != null) Destroy(grass);
+        }
+        activeGrass.Clear();
     }
 }

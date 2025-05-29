@@ -13,8 +13,21 @@ public class Player : MonoBehaviour
 
     private void FixedUpdate()
     {
+        Debug.Log(Money);
         var inputVector = GameInput.Instance.GetMovemmentVector();
         inputVector.Normalize();
         rb.MovePosition(rb.position+inputVector*(movingSpeed * Time.fixedDeltaTime));
+    }
+    public void AddMoney(int amount) => Money += amount;
+
+    public bool CanSpendMoney(int amount)
+    {
+        if (Money >= amount)
+        {
+            Money -= amount;
+            return true;
+        }
+        else
+            return false;
     }
 }
