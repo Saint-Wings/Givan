@@ -1,66 +1,79 @@
-﻿using System.Collections;
-using UnityEngine;
+﻿using UnityEngine;
+using System.Collections;
 
 public class WanderingAnimal : Animal
 {
     [Header("Wandering Settings")]
-    [SerializeField] private float moveSpeed = 1.5f;
+    [SerializeField] private float moveSpeed = 2f;
     [SerializeField] private float minIdleTime = 1f;
     [SerializeField] private float maxIdleTime = 4f;
-    [SerializeField] private float wanderRadius = 5f;
+    [SerializeField][Range(0, 0.1f)] private float directionChangeChance = 0.01f;
+    [SerializeField] private float minMoveTime = 2f;
 
-    private Vector2 wanderCenter;
     private bool isWaiting;
+    private Vector2 currentDirection;
+    private float lastDirectionChangeTime;
 
     protected override void Awake()
     {
         base.Awake();
-        wanderCenter = transform.position;
-        SetRandomTarget();
-
-        // Фиксируем вращение по Z
-        transform.rotation = Quaternion.identity;
+        SetRandomDirection();
+        Debug.Log("Initial Bounds: " + movementBounds);
     }
 
-    protected override void Update()
+    private void SetRandomDirection()
     {
+        currentDirection = Random.insideUnitCircle.normalized;
+        Debug.Log("New Direction: " + currentDirection);
+    }
+
+    private void Update()
+    {
+        base.Update();
+
         if (!isWaiting)
         {
-            MoveToTarget();
-            CheckDistance();
+            Move();
+            CheckForDirectionChange();
+            CheckForRest();
         }
     }
 
-    private void MoveToTarget()
+    private void Move()
     {
-        transform.position = Vector2.MoveTowards(
-            transform.position,
-            currentTarget.position,
-            moveSpeed * Time.deltaTime
-        );
+        Vector2 newPosition = (Vector2)transform.position + currentDirection * moveSpeed * Time.deltaTime;
+        transform.position = newPosition;
     }
 
-    private void CheckDistance()
+    private void CheckForDirectionChange()
     {
-        if (Vector2.Distance(transform.position, currentTarget.position) <= stoppingDistance)
+        if (Time.time - lastDirectionChangeTime < minMoveTime) return;
+
+        bool nearBorder =
+            transform.position.x <= movementBounds.min.x + 0.5f ||
+            transform.position.x >= movementBounds.max.x - 0.5f ||
+            transform.position.y <= movementBounds.min.y + 0.5f ||
+            transform.position.y >= movementBounds.max.y - 0.5f;
+
+        if (nearBorder || Random.value < directionChangeChance)
         {
-            StartCoroutine(WaitAndMove());
+            SetRandomDirection();
+            lastDirectionChangeTime = Time.time;
         }
     }
 
-    private IEnumerator WaitAndMove()
+    private void CheckForRest()
+    {
+        if (Random.value < 0.005f)
+        {
+            StartCoroutine(RestRoutine());
+        }
+    }
+
+    private IEnumerator RestRoutine()
     {
         isWaiting = true;
         yield return new WaitForSeconds(Random.Range(minIdleTime, maxIdleTime));
-        SetRandomTarget();
         isWaiting = false;
-    }
-
-    private void SetRandomTarget()
-    {
-        Vector2 randomPoint = wanderCenter + Random.insideUnitCircle * wanderRadius;
-        currentTarget = new GameObject("WanderTarget").transform;
-        currentTarget.position = randomPoint;
-        UpdateSpriteDirection(); // Обновляем направление спрайта
     }
 }

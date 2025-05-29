@@ -1,57 +1,56 @@
 ﻿using UnityEngine;
 
+using UnityEngine;
+
 public class PredatorAnimal : Animal
 {
     [Header("Predator Settings")]
     [SerializeField] private float chaseSpeed = 4f;
     [SerializeField] private float attackRange = 1f;
     [SerializeField] private float detectionRadius = 10f;
-    [SerializeField] private float targetUpdateInterval = 1f;
-
-    private float lastTargetUpdateTime;
-    private WanderingAnimal[] potentialPrey;
+    [SerializeField] private LayerMask preyLayer;
 
     private void Start()
     {
-        potentialPrey = FindObjectsOfType<WanderingAnimal>();
-        lastTargetUpdateTime = -targetUpdateInterval;
-
-        // Фиксируем вращение по Z
-        transform.rotation = Quaternion.identity;
+        InvokeRepeating(nameof(FindClosestPrey), 0.5f, 1f);
     }
 
     protected override void Update()
     {
-        if (Time.time - lastTargetUpdateTime >= targetUpdateInterval)
-        {
-            FindClosestPrey();
-            lastTargetUpdateTime = Time.time;
-        }
+        base.Update(); // Обработка границ
 
         if (currentTarget != null)
         {
+            if (currentTarget.gameObject == null)
+            {
+                currentTarget = null;
+                return;
+            }
+
             ChaseTarget();
         }
     }
 
     private void FindClosestPrey()
     {
-        WanderingAnimal closestPrey = null;
+        Collider2D[] preyColliders = Physics2D.OverlapCircleAll(transform.position, detectionRadius, preyLayer);
+
+        Transform closestPrey = null;
         float closestDistance = Mathf.Infinity;
 
-        foreach (WanderingAnimal prey in potentialPrey)
+        foreach (var prey in preyColliders)
         {
             if (prey == null) continue;
 
             float distance = Vector2.Distance(transform.position, prey.transform.position);
-            if (distance < detectionRadius && distance < closestDistance)
+            if (distance < closestDistance)
             {
                 closestDistance = distance;
-                closestPrey = prey;
+                closestPrey = prey.transform;
             }
         }
 
-        SetTarget(closestPrey?.transform);
+        SetTarget(closestPrey);
     }
 
     private void ChaseTarget()
@@ -65,7 +64,7 @@ public class PredatorAnimal : Animal
                 currentTarget.position,
                 chaseSpeed * Time.deltaTime
             );
-            UpdateSpriteDirection(); // Обновляем направление при движении
+            UpdateSpriteDirection();
         }
         else
         {
@@ -76,5 +75,13 @@ public class PredatorAnimal : Animal
     private void AttackPrey()
     {
         Debug.Log($"{name} атакует {currentTarget.name}!");
+        Destroy(currentTarget.gameObject);
+        currentTarget = null;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, detectionRadius);
     }
 }
